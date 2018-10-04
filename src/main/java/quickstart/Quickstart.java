@@ -14,16 +14,10 @@ import java.nio.channels.FileChannel;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.security.InvalidKeyException;
+import java.time.OffsetDateTime;
+import java.util.Locale;
 
-import com.microsoft.azure.storage.blob.BlobRange;
-import com.microsoft.azure.storage.blob.BlockBlobURL;
-import com.microsoft.azure.storage.blob.ContainerURL;
-import com.microsoft.azure.storage.blob.ListBlobsOptions;
-import com.microsoft.azure.storage.blob.PipelineOptions;
-import com.microsoft.azure.storage.blob.ServiceURL;
-import com.microsoft.azure.storage.blob.SharedKeyCredentials;
-import com.microsoft.azure.storage.blob.StorageURL;
-import com.microsoft.azure.storage.blob.TransferManager;
+import com.microsoft.azure.storage.blob.*;
 import com.microsoft.azure.storage.blob.models.BlobItem;
 import com.microsoft.azure.storage.blob.models.ContainerCreateResponse;
 import com.microsoft.azure.storage.blob.models.ContainerListBlobFlatSegmentResponse;
@@ -34,6 +28,11 @@ import io.reactivex.*;
 import io.reactivex.Flowable;
 
 public class Quickstart {
+
+    public static final String ACCOUNT_NAME = System.getenv("AZURE_STORAGE_ACCOUNT");
+    public static final String ACCOUNT_KEY = System.getenv("AZURE_STORAGE_ACCESS_KEY");
+    public static final String CONTAINER_NAME = "quickstart";
+
     static File createTempFile() throws IOException {
 
         // Here we are creating a temporary file to use for download and upload to Blob storage
@@ -45,6 +44,27 @@ public class Quickstart {
         output.close();
 
         return sampleFile;
+    }
+
+    static String getSASURL(String blobName) throws InvalidKeyException, MalformedURLException {
+        SharedKeyCredentials credential = new SharedKeyCredentials(ACCOUNT_NAME, ACCOUNT_KEY);
+        ServiceSASSignatureValues values = new ServiceSASSignatureValues()
+                .withProtocol(SASProtocol.HTTPS_ONLY)
+                .withExpiryTime(OffsetDateTime.now().plusDays(2))
+                .withContainerName(CONTAINER_NAME)
+                .withBlobName(blobName);
+
+        BlobSASPermission permission = new BlobSASPermission()
+                .withRead(true)
+                .withAdd(true);
+        values.withPermissions(permission.toString());
+
+        SASQueryParameters params = values.generateSASQueryParameters(credential);
+
+        String encodedParams = params.encode();
+
+        return String.format(Locale.ROOT, "https://%s.blob.core.windows.net/%s/%s%s",
+                ACCOUNT_NAME, CONTAINER_NAME, blobName, encodedParams);
     }
 
     static void uploadFile(BlockBlobURL blob, File sourceFile) throws IOException {
@@ -149,18 +169,15 @@ public class Quickstart {
 
             File downloadedFile = File.createTempFile("downloadedFile", ".txt");
 
-            // Retrieve the credentials and initialize SharedKeyCredentials
-            String accountName = System.getenv("AZURE_STORAGE_ACCOUNT");
-            String accountKey = System.getenv("AZURE_STORAGE_ACCESS_KEY");
 
             // Create a ServiceURL to call the Blob service. We will also use this to construct the ContainerURL
-            SharedKeyCredentials creds = new SharedKeyCredentials(accountName, accountKey);
+            SharedKeyCredentials creds = new SharedKeyCredentials(ACCOUNT_NAME, ACCOUNT_KEY);
             // We are using a default pipeline here, you can learn more about it at https://github.com/Azure/azure-storage-java/wiki/Azure-Storage-Java-V10-Overview
-            final ServiceURL serviceURL = new ServiceURL(new URL("http://" + accountName + ".blob.core.windows.net"), StorageURL.createPipeline(creds, new PipelineOptions()));
+            final ServiceURL serviceURL = new ServiceURL(new URL("http://" + ACCOUNT_NAME + ".blob.core.windows.net"), StorageURL.createPipeline(creds, new PipelineOptions()));
 
             // Let's create a container using a blocking call to Azure Storage
             // If container exists, we'll catch and continue
-            containerURL = serviceURL.createContainerURL("quickstart");
+            containerURL = serviceURL.createContainerURL(CONTAINER_NAME);
 
             try {
                 ContainerCreateResponse response = containerURL.create(null, null, null).blockingGet();
@@ -174,7 +191,8 @@ public class Quickstart {
             }
 
             // Create a BlockBlobURL to run operations on Blobs
-            final BlockBlobURL blobURL = containerURL.createBlockBlobURL("SampleBlob.txt");
+            String blobName = "SampleBlob.txt";
+            final BlockBlobURL blobURL = containerURL.createBlockBlobURL(blobName);
 
             // Listening for commands from the console
             System.out.println("Enter a command");
@@ -190,6 +208,7 @@ public class Quickstart {
                     case "P":
                         System.out.println("Uploading the sample file into the container: " + containerURL );
                         uploadFile(blobURL, sampleFile);
+                        System.out.println("SAS Url: " + getSASURL(blobName));
                         break;
                     case "L":
                         System.out.println("Listing blobs in the container: " + containerURL );
