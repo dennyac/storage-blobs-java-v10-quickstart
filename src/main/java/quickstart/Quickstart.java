@@ -1,12 +1,6 @@
 package quickstart;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.Writer;
+import java.io.*;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.channels.AsynchronousFileChannel;
@@ -15,7 +9,11 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.security.InvalidKeyException;
 import java.time.OffsetDateTime;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 import com.microsoft.azure.storage.blob.*;
 import com.microsoft.azure.storage.blob.models.BlobItem;
@@ -33,17 +31,42 @@ public class Quickstart {
     public static final String ACCOUNT_KEY = System.getenv("AZURE_STORAGE_ACCESS_KEY");
     public static final String CONTAINER_NAME = "quickstart";
 
-    static File createTempFile() throws IOException {
+    static File createTempFile(String filename, String extension) throws IOException {
 
         // Here we are creating a temporary file to use for download and upload to Blob storage
         File sampleFile = null;
-        sampleFile = File.createTempFile("sampleFile", ".txt");
+        sampleFile = File.createTempFile(filename, extension);
         System.out.println(">> Creating a sample file at: " + sampleFile.toString());
         Writer output = new BufferedWriter(new FileWriter(sampleFile));
         output.write("Hello Azure!");
         output.close();
 
         return sampleFile;
+    }
+
+    static File createTempZipFile(String filename, String extension) throws IOException {
+
+        List<String> srcFiles = Arrays.asList("test1", "test2");
+        String fileExtension = ".txt";
+        FileOutputStream fos = new FileOutputStream(String.format("%s%s", filename, extension));
+        ZipOutputStream zipOut = new ZipOutputStream(fos);
+        for (String srcFile : srcFiles) {
+            File fileToZip = createTempFile(srcFile, fileExtension);
+            FileInputStream fis = new FileInputStream(fileToZip);
+            ZipEntry zipEntry = new ZipEntry(fileToZip.getName());
+            zipOut.putNextEntry(zipEntry);
+
+            byte[] bytes = new byte[1024];
+            int length;
+            while((length = fis.read(bytes)) >= 0) {
+                zipOut.write(bytes, 0, length);
+            }
+            fis.close();
+        }
+        zipOut.close();
+        fos.close();
+
+        return new File(String.format("%s%s", filename, extension));
     }
 
     static String getSASURL(String blobName) throws InvalidKeyException, MalformedURLException {
@@ -162,10 +185,15 @@ public class Quickstart {
         ContainerURL containerURL;
 
         // Creating a sample file to use in the sample
-        File sampleFile = null;
+        File sampleZipFile = null;
 
         try {
-            sampleFile = createTempFile();
+
+            String filename = "SampleArchive";
+            String extension = ".zip";
+            sampleZipFile = createTempZipFile(filename, extension);
+
+
 
             File downloadedFile = File.createTempFile("downloadedFile", ".txt");
 
@@ -191,7 +219,7 @@ public class Quickstart {
             }
 
             // Create a BlockBlobURL to run operations on Blobs
-            String blobName = "SampleBlob.txt";
+            String blobName = String.format("%s%s", filename, extension);
             final BlockBlobURL blobURL = containerURL.createBlockBlobURL(blobName);
 
             // Listening for commands from the console
@@ -207,7 +235,7 @@ public class Quickstart {
                 switch(input){
                     case "P":
                         System.out.println("Uploading the sample file into the container: " + containerURL );
-                        uploadFile(blobURL, sampleFile);
+                        uploadFile(blobURL, sampleZipFile);
                         System.out.println("SAS Url: " + getSASURL(blobName));
                         break;
                     case "L":
