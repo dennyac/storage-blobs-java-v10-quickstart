@@ -173,7 +173,7 @@ public class Quickstart {
             // Create a ServiceURL to call the Blob service. We will also use this to construct the ContainerURL
             SharedKeyCredentials creds = new SharedKeyCredentials(ACCOUNT_NAME, ACCOUNT_KEY);
             // We are using a default pipeline here, you can learn more about it at https://github.com/Azure/azure-storage-java/wiki/Azure-Storage-Java-V10-Overview
-            final ServiceURL serviceURL = new ServiceURL(new URL("http://" + ACCOUNT_NAME + ".blob.core.windows.net"), StorageURL.createPipeline(creds, new PipelineOptions()));
+            final ServiceURL serviceURL = new ServiceURL(new URL("https://" + ACCOUNT_NAME + ".blob.core.windows.net"), StorageURL.createPipeline(creds, new PipelineOptions()));
 
             // Let's create a container using a blocking call to Azure Storage
             // If container exists, we'll catch and continue
