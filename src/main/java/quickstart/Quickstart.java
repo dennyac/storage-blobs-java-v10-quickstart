@@ -4,7 +4,9 @@ import java.io.*;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.channels.AsynchronousFileChannel;
+import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
+import java.nio.channels.ReadableByteChannel;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.security.InvalidKeyException;
@@ -42,6 +44,16 @@ public class Quickstart {
         output.close();
 
         return sampleFile;
+    }
+
+    static File downloadFromURL(String urlString, String filename, String extension) throws IOException {
+        URL url = new URL(urlString);
+        ReadableByteChannel readableByteChannel = Channels.newChannel(url.openStream());
+        FileOutputStream fileOutputStream = new FileOutputStream(String.format("%s%s", filename, extension));
+        FileChannel fileChannel = fileOutputStream.getChannel();
+        fileOutputStream.getChannel()
+                .transferFrom(readableByteChannel, 0, Long.MAX_VALUE);
+        return new File(String.format("%s%s", filename, extension));
     }
 
     static File createTempZipFile(String filename, String extension) throws IOException {
@@ -189,9 +201,10 @@ public class Quickstart {
 
         try {
 
-            String filename = "SampleArchive";
+            String filename = "SampleArchiveFromURL";
             String extension = ".zip";
-            sampleZipFile = createTempZipFile(filename, extension);
+            String url = "https://testblaub.blob.core.windows.net/quickstart/SampleArchive.zip?sv=2018-03-28&spr=https&se=2018-10-13T22%3A57%3A40Z&sr=b&sp=ra&sig=CwtNboHxmHQart0gjoajgm7HWsWYnSllARWwiw3zvBA%3D";
+            sampleZipFile = downloadFromURL(url, "test", ".zip");
 
 
 
@@ -254,6 +267,7 @@ public class Quickstart {
                     case "E":
                         System.out.println("Cleaning up the sample and exiting!");
                         containerURL.delete(null, null).blockingGet();
+                        sampleZipFile.delete();
                         downloadedFile.delete();
                         System.exit(0);
                         break;
